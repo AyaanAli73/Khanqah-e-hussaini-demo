@@ -1,0 +1,29 @@
+/* Admin Panel Styles (admin.html) */
+
+/* Admin Print Mode */
+@media print {
+    body * { visibility: hidden; }
+    #printArea, #printArea * { visibility: visible; }
+    #printArea { position: absolute; left: 0; top: 0; width: 100%; height: auto; background: white; padding: 20px; }
+    .no-print { display: none !important; }
+}
+.modal-active { display: flex !important; }
+
+/* Custom Scrollbar */
+.custom-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
+.custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+.custom-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+.custom-scroll::-webkit-scrollbar-thumb:hover { background: #999; }
+
+/* Toast */
+#toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 20000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.toast { background: white; color: #1f2937; padding: 12px 20px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border-left: 4px solid; display: flex; align-items: center; gap: 12px; opacity: 0; transform: translateY(-20px); transition: all 0.3s ease; pointer-events: auto; font-weight: 600; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.error { border-color: #ef4444; }
+.toast.success { border-color: #10b981; }
+
+.tab-btn.active { border-bottom: 2px solid #002B20; color: #002B20; font-weight: 700; }
+
+@keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
+.shake { animation: shake 0.5s; border-color: #ef4444 !important; }
+
