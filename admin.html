@@ -65,7 +65,6 @@
             <nav class="flex-1 p-4 space-y-2">
                 <a href="#" onclick="switchTab('active')" class="flex items-center gap-3 px-4 py-3 bg-white/10 rounded-lg text-gold font-bold"><i class="fas fa-ticket-alt w-5"></i> Dashboard</a>
                 
-                <!-- NEW: Site Settings Button -->
                 <button onclick="openSettingsModal()" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-lg text-gray-300 transition text-left border border-gold/20 bg-gold/5"><i class="fas fa-sliders-h w-5 text-gold"></i> Site Settings</button>
                 
                 <button onclick="openScheduleModal()" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 rounded-lg text-gray-300 transition text-left"><i class="fas fa-calendar-alt w-5"></i> Manage Schedule</button>
@@ -96,25 +95,58 @@
             </header>
 
             <div class="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-100">
+                <!-- STATS CARDS -->
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100">
-                        <div class="flex justify-between items-start">
-                            <div><p class="text-gray-500 text-[10px] md:text-xs uppercase font-bold tracking-wider">Total</p><h3 class="text-2xl md:text-3xl font-bold text-royal mt-1" id="statTotal">0</h3></div>
-                            <div class="p-2 md:p-3 bg-blue-50 text-blue-600 rounded-lg text-sm md:text-base"><i class="fas fa-users"></i></div>
+                    <!-- Total -->
+                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
+                         <div class="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-blue-50 to-transparent opacity-50"></div>
+                        <div class="flex justify-between items-start relative z-10">
+                            <div><p class="text-gray-400 text-[10px] uppercase font-bold tracking-wider">Total Bookings</p><h3 class="text-3xl font-bold text-royal mt-1" id="statTotal">0</h3></div>
+                            <div class="p-3 bg-blue-50 text-blue-600 rounded-lg"><i class="fas fa-users"></i></div>
                         </div>
                     </div>
-                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100">
-                        <div class="flex justify-between items-start">
-                            <div><p class="text-gray-500 text-[10px] md:text-xs uppercase font-bold tracking-wider">Today</p><h3 class="text-2xl md:text-3xl font-bold text-emerald-700 mt-1" id="statToday">0</h3></div>
-                            <div class="p-2 md:p-3 bg-emerald-50 text-emerald-600 rounded-lg text-sm md:text-base"><i class="fas fa-calendar-day"></i></div>
+                    
+                    <!-- Today -->
+                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 relative overflow-hidden">
+                        <div class="absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-emerald-50 to-transparent opacity-50"></div>
+                        <div class="flex justify-between items-start relative z-10">
+                            <div><p class="text-gray-400 text-[10px] uppercase font-bold tracking-wider">Reserved Today</p><h3 class="text-3xl font-bold text-emerald-700 mt-1" id="statToday">0</h3></div>
+                            <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><i class="fas fa-calendar-check"></i></div>
                         </div>
                     </div>
-                    <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 col-span-2 md:col-span-1 relative group">
-                        <div class="flex justify-between items-start">
-                            <div><p class="text-gray-500 text-[10px] md:text-xs uppercase font-bold tracking-wider">Next System ID</p><h3 class="text-2xl md:text-3xl font-bold text-gold mt-1" id="statNext">Loading...</h3></div>
-                            <div class="p-2 md:p-3 bg-yellow-50 text-yellow-600 rounded-lg text-sm md:text-base"><i class="fas fa-hashtag"></i></div>
+                    
+                    <!-- Next Token (UPDATED DESIGN) -->
+                    <div class="bg-white p-5 md:p-6 rounded-xl shadow-sm border border-gray-100 col-span-2 md:col-span-1 relative group overflow-visible">
+                        <div class="absolute right-0 top-0 h-full w-24 bg-gradient-to-l from-yellow-50 to-transparent opacity-50 rounded-r-xl"></div>
+                        
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <p class="text-gray-400 text-[10px] uppercase font-bold tracking-wider mb-1">Counter Status For</p>
+                                    
+                                    <!-- Stylish Dropdown -->
+                                    <div class="relative inline-block group/select">
+                                        <select id="statNextDateFilter" class="appearance-none bg-transparent font-bold text-royal text-sm pr-6 outline-none cursor-pointer border-b border-dashed border-gray-300 pb-0.5 focus:border-gold hover:text-gold transition w-full md:w-auto">
+                                            <!-- JS Fills This -->
+                                        </select>
+                                        <i class="fas fa-chevron-down absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] pointer-events-none group-hover/select:text-gold transition"></i>
+                                    </div>
+                                </div>
+                                <div class="w-10 h-10 rounded-lg bg-yellow-50 flex items-center justify-center text-yellow-600 shadow-sm border border-yellow-100">
+                                    <i class="fas fa-sort-numeric-up-alt"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-baseline gap-2 mt-2">
+                                <h3 class="text-3xl font-bold text-gold" id="statNext">...</h3>
+                                <span class="text-xs text-gray-400 font-medium">Next ID</span>
+                            </div>
+
+                            <!-- Reset Button -->
+                            <button onclick="resetCounter()" class="absolute bottom-3 right-3 text-gray-300 hover:text-red-500 hover:bg-red-50 p-2 rounded-full transition duration-300" title="Reset Counter to 0">
+                                <i class="fas fa-redo-alt text-xs"></i>
+                            </button>
                         </div>
-                        <button onclick="resetCounter()" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 p-2 transition" title="Reset Counter to 0"><i class="fas fa-redo-alt text-xs"></i></button>
                     </div>
                 </div>
 
