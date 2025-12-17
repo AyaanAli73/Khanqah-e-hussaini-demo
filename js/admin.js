@@ -12,7 +12,8 @@ let bookingsUnsubscribe = null;
 let settingsUnsubscribe = null;
 let siteConfigUnsubscribe = null;
 
-const COUNTER_DOC_ID = 'main';
+// New variable to track Next Token Listener
+let nextTokenUnsubscribe = null;
 
 // --- AUTHENTICATION & SECURITY ---
 
@@ -38,14 +39,19 @@ onAuthStateChanged(auth, (user) => {
         document.getElementById('loginOverlay').classList.add('hidden');
         initRealtimeListener();
         initSettingsListener();
-        initSiteConfigListener(); // NEW
+        initSiteConfigListener();
+        setupNextTokenUI(); // NEW: Initialize Next Token Dropdown
         showToast("Welcome Admin");
     } else {
         currentUser = null;
         document.getElementById('loginOverlay').classList.remove('hidden');
+        
+        // Unsubscribe all listeners
         if (bookingsUnsubscribe) bookingsUnsubscribe();
         if (settingsUnsubscribe) settingsUnsubscribe();
         if (siteConfigUnsubscribe) siteConfigUnsubscribe();
+        if (nextTokenUnsubscribe) nextTokenUnsubscribe();
+
         allBookings = [];
         document.getElementById('bookingsTable').innerHTML = '';
         document.getElementById('statTotal').textContent = '0';
@@ -63,7 +69,8 @@ window.logout = async () => {
 
 function initRealtimeListener() {
     if (!currentUser) return;
-    const q = query(collection(db, COLLECTIONS.BOOKINGS), orderBy("tokenNumber", "desc"));
+    const q = query(collection(db, COLLECTIONS.BOOKINGS), orderBy("timestamp", "desc"));
+    
     bookingsUnsubscribe = onSnapshot(q, (snapshot) => {
         allBookings = [];
         snapshot.forEach((doc) => allBookings.push({ id: doc.id, ...doc.data() }));
@@ -73,9 +80,6 @@ function initRealtimeListener() {
     }, (error) => {
         console.error("Data access denied:", error);
         showToast("Access Denied: You do not have permission.", "error");
-    });
-    onSnapshot(doc(db, COLLECTIONS.COUNTERS, COUNTER_DOC_ID), (doc) => {
-        document.getElementById('statNext').textContent = "#" + ((doc.data()?.current || 0) + 1);
     });
 }
 
@@ -90,7 +94,6 @@ function initSettingsListener() {
     });
 }
 
-// NEW: Listener for Site Config
 function initSiteConfigListener() {
     if (!currentUser) return;
     siteConfigUnsubscribe = onSnapshot(doc(db, COLLECTIONS.SETTINGS, 'site_config'), (docSnap) => {
@@ -101,6 +104,57 @@ function initSiteConfigListener() {
             document.getElementById('popupMessageInput').value = data.popupMessage || '';
             document.getElementById('popupImageInput').value = data.popupImageUrl || '';
         }
+    });
+}
+
+// --- NEW: Next Token Date Selection Logic ---
+
+function setupNextTokenUI() {
+    const select = document.getElementById('statNextDateFilter');
+    select.innerHTML = '';
+    const today = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    // Populate Dropdown with Today + next 6 days
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const isoDate = d.toISOString().split('T')[0];
+        const dayName = days[d.getDay()];
+        
+        const option = document.createElement('option');
+        option.value = isoDate;
+        
+        if (i === 0) option.textContent = `Today (${dayName})`;
+        else if (i === 1) option.textContent = `Tomorrow (${dayName})`;
+        else option.textContent = `${dayName} (${isoDate.split('-').slice(1).join('/')})`; // Show formatted date
+        
+        select.appendChild(option);
+    }
+    
+    // Default select Today
+    select.value = today.toISOString().split('T')[0];
+    
+    // Initialize listener for the default selection
+    watchNextToken(select.value);
+
+    // Add change listener
+    select.addEventListener('change', (e) => {
+        watchNextToken(e.target.value);
+    });
+}
+
+function watchNextToken(dateCode) {
+    if (!currentUser) return;
+    
+    // Stop listening to previous date
+    if (nextTokenUnsubscribe) nextTokenUnsubscribe();
+
+    // Start listening to new date
+    document.getElementById('statNext').textContent = '...';
+    nextTokenUnsubscribe = onSnapshot(doc(db, COLLECTIONS.COUNTERS, dateCode), (doc) => {
+        const nextVal = (doc.data()?.current || 0) + 1;
+        document.getElementById('statNext').textContent = "#" + nextVal;
     });
 }
 
@@ -135,10 +189,12 @@ window.renderTable = function() {
     const todayISO = new Date().toISOString().split('T')[0];
     const term = document.getElementById('searchInput').value.toLowerCase();
     const dayFilter = document.getElementById('dayFilter').value;
+    
     const filtered = allBookings.filter(b => {
         const isMatch = (b.name || '').toLowerCase().includes(term) || String(b.tokenNumber).includes(term);
         if (!isMatch) return false;
         if (dayFilter !== 'all' && b.day !== dayFilter) return false;
+        
         if (currentTab === 'active') {
             return !b.dateCode || b.dateCode >= todayISO;
         } else {
@@ -318,27 +374,40 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     const originalText = btn.textContent;
     btn.textContent = "Generating...";
     btn.disabled = true;
+
     const name = document.getElementById('addName').value.trim();
     const mobile = document.getElementById('addMobile').value.trim();
     const city = document.getElementById('addCity').value.trim();
     const rawDay = document.getElementById('addDay').value; 
     let dateCode, dayLabel;
+    
+    // Parse Date
     if (rawDay.includes('|')) {
         [dateCode, dayLabel] = rawDay.split('|');
     } else {
         dateCode = new Date().toISOString().split('T')[0];
-        dayLabel = rawDay;
+        dayLabel = "Manual (" + dateCode + ")";
     }
+
     try {
+        const counterRef = doc(db, COLLECTIONS.COUNTERS, dateCode);
+        const dailyRef = doc(db, COLLECTIONS.COUNTERS, 'daily_counts');
+        
         await runTransaction(db, async (transaction) => {
-            const counterRef = doc(db, COLLECTIONS.COUNTERS, COUNTER_DOC_ID);
             const counterSnap = await transaction.get(counterRef);
+            const dailySnap = await transaction.get(dailyRef);
+            
             let newToken = 1;
             if (counterSnap.exists()) {
                 newToken = (counterSnap.data().current || 0) + 1;
             }
+            const currentDaily = dailySnap.exists() ? (dailySnap.data()[dateCode] || 0) : 0;
+            
             const newBookingRef = doc(collection(db, COLLECTIONS.BOOKINGS));
+            
             transaction.set(counterRef, { current: newToken }, { merge: true });
+            transaction.set(dailyRef, { [dateCode]: currentDaily + 1 }, { merge: true });
+            
             transaction.set(newBookingRef, {
                 tokenNumber: newToken,
                 name: name,
@@ -449,10 +518,9 @@ document.getElementById('confirmDeleteAllBtn').addEventListener('click', async (
         const batch = writeBatch(db);
         const snaps = await getDocs(collection(db, COLLECTIONS.BOOKINGS));
         snaps.forEach(doc => batch.delete(doc.ref));
-        batch.set(doc(db, COLLECTIONS.COUNTERS, 'main'), { current: 0 });
         batch.delete(doc(db, COLLECTIONS.COUNTERS, 'daily_counts'));
         await batch.commit();
-        showToast("All data wiped & counter reset.");
+        showToast("All bookings deleted & UI counters reset.");
         closeModal('deleteAllModal');
 });
 
@@ -476,6 +544,16 @@ window.toggleSidebar = () => {
         ov.classList.add('hidden');
     }
 }
+
+// MODIFIED: Reset Counter now uses the dropdown value
 window.resetCounter = async () => {
-    if(confirm("Reset Token Counter to 0?")) await setDoc(doc(db, COLLECTIONS.COUNTERS, 'main'), { current: 0 });
-}
+    const dateSelect = document.getElementById('statNextDateFilter');
+    const selectedDate = dateSelect.value;
+    
+    // Find text for confirmation message
+    const selectedText = dateSelect.options[dateSelect.selectedIndex].text;
+
+    if(confirm(`Reset Token Counter for ${selectedText} to 0?`)) {
+        await setDoc(doc(db, COLLECTIONS.COUNTERS, selectedDate), { current: 0 });
+    }
+            }
