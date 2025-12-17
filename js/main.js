@@ -9,7 +9,7 @@ let dayLimits = {};
 let dayCounts = {};
 const submitBtn = document.getElementById('submitBtn');
 const btnText = document.getElementById('btnText');
-const COUNTER_DOC_ID = 'main';
+// COUNTER_DOC_ID ki ab zarurat nahi hai specific date logic ke liye, but purane reference ke liye rakha hai
 
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
@@ -34,7 +34,7 @@ function initListeners() {
         populateDates();
     }, (e) => console.log("Settings sync error", e));
 
-    // 2. Daily Counts
+    // 2. Daily Counts (UI par (FULL) dikhane ke liye abhi bhi yehi use hoga)
     onSnapshot(doc(db, COLLECTIONS.COUNTERS, 'daily_counts'), (doc) => {
         if(doc.exists()) {
             dayCounts = doc.data();
@@ -57,7 +57,7 @@ function initListeners() {
                 maintenanceDiv.classList.add('hidden');
             }
 
-            // Handle Popup - Show Every Time (No Session Storage Check)
+            // Handle Popup - Show Every Time
             const popupModal = document.getElementById('globalPopupModal');
             const popupText = document.getElementById('globalPopupText');
             const popupImgContainer = document.getElementById('popupImageContainer');
@@ -169,18 +169,23 @@ document.getElementById('tokenForm').addEventListener('submit', async function(e
     const [dateCode, dayLabel] = dayValue.split('|');
 
     try {
-        const counterRef = doc(db, COLLECTIONS.COUNTERS, COUNTER_DOC_ID);
+        // --- NEW LOGIC: Use specific date counter ---
+        const counterRef = doc(db, COLLECTIONS.COUNTERS, dateCode); 
+        // We still check 'daily_counts' for aggregate limits to keep UI logic consistent
         const dailyRef = doc(db, COLLECTIONS.COUNTERS, 'daily_counts');
         const bookingsCol = collection(db, COLLECTIONS.BOOKINGS);
 
         const newTokenNum = await runTransaction(db, async (transaction) => {
             const counterDoc = await transaction.get(counterRef);
+            const dailyDoc = await transaction.get(dailyRef);
+
+            // 1. Calculate Token Number for THIS SPECIFIC DATE
             let nextToken = 1;
             if (counterDoc.exists()) {
                 nextToken = (counterDoc.data().current || 0) + 1;
             }
 
-            const dailyDoc = await transaction.get(dailyRef);
+            // 2. Check Limits (using daily_counts summary)
             const currentDailyCount = dailyDoc.exists() ? (dailyDoc.data()[dateCode] || 0) : 0;
             const limit = dayLimits[dateCode] || 0;
             
@@ -188,6 +193,7 @@ document.getElementById('tokenForm').addEventListener('submit', async function(e
                 throw new Error("Sorry, bookings for this day are full.");
             }
 
+            // 3. Update BOTH: Specific Counter (for ID) and Daily Counts (for UI Limit)
             transaction.set(counterRef, { current: nextToken }, { merge: true });
             transaction.set(dailyRef, { [dateCode]: currentDailyCount + 1 }, { merge: true });
 
